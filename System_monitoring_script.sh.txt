@@ -1,0 +1,115 @@
+
+#!/bin/bash
+#root_disk="$(df -hT | grep -w "/" | awk '{print $1}' | head -n 1| cut -c 6-)"
+cpu=$(nproc)
+echo  "Hostname:"
+OUTPUT=$1
+echo "${OUTPUT}"
+machine_type=$hostname
+#echo $(( hostname=1 ))
+if  [ $OUTPUT == 1 ]
+then
+        result_additional_drive=0
+        required_cpu=4
+        required_mem=8
+else
+        result_additional_drive=100
+        required_cpu=8
+        required_mem=16
+fi
+echo  "-------------------------------OS-Flavour------------------------------------"
+setcolordef=$(tput sgr0)
+setcolorred=$(tput setaf 1)
+setcolorgreen=$(tput setaf 2)
+result_flavour=$( cat /etc/os-release | grep -w -E "NAME" | awk -F '"' '{print $2}')
+if [ "$result_flavour" = "Ubuntu" ]
+then
+        echo "OS FLAVOUR: ${setcolorgreen}$result_flavour${setcolordef}"
+else
+        echo "OS FLAVOUR:  ${setcolorred}$result_flavour${setcolordef}"
+fi
+
+echo  "-------------------------------OS-Version------------------------------------"
+setcolordef=$(tput sgr0)
+setcolorred=$(tput setaf 1)
+setcolorgreen=$(tput setaf 2)
+result_version=$( cat /etc/os-release | grep -w -E "VERSION_ID" | awk -F '"' '{print $2}' )
+#echo "$result_version"
+if [ $result_version = "20.04" ]
+then
+        echo "OS Version: ${setcolorgreen}$result_version${setcolordef}"
+else
+        echo "OS Version:  ${setcolorred}$result_version${setcolordef}"
+fi
+echo  "-------------------------------CPU-Cores and Memory---------------------------"
+setcolordef=$(tput sgr0)
+setcolorred=$(tput setaf 1)
+setcolorgreen=$(tput setaf 2)
+result_core=$(nproc)
+result_memory=$(free -h | grep "Mem" | awk '{print $2}' | awk -F 'G' '{print $1}')
+if [ $result_core -ge $required_cpu ]
+then
+        echo "CPU Core Count: ${setcolorgreen}$result_core${setcolordef}"
+
+else
+        echo "CPU Core Count: ${setcolorred}$result_core${setcolordef}"
+
+fi
+if [ $result_memory -ge $required_mem ]
+then
+        echo "CPU Memory (GB): ${setcolorgreen}$result_memory${setcolordef}"
+else
+        echo "CPU Memory (GB): ${setcolorred}$result_memory${setcolordef}"
+fi
+echo  "-------------------------------OS-Drives-----------------------------"
+apt install jq -y
+#echo "Disk List:"
+setcolordef=$(tput sgr0)
+setcolorred=$(tput setaf 1)
+setcolorgreen=$(tput setaf 2)
+root_disk1=$(df -hT  | grep -w "/" | awk '{print $1}' | awk -F 'G' '{print $1}'| head -n 1| cut -c 6- | sed 's/[0-9]*//g')
+result_os_drive=$( lsblk -d | grep "$root_disk1" | awk '{print $4}' | awk -F 'G' '{print $1}' )
+if [[ $result_os_drive -ge 30 ]]
+then
+        echo "OS-Drive (GB): ${setcolorgreen}$result_os_drive${setcolordef}"
+else
+        echo "OS-Drive (GB): ${setcolorred}$result_os_drive${setcolordef}"
+fi
+
+#lsblk | grep "$(lsblk --fs --json | jq -r  '.blockdevices[] | select(.children == null and .fstype == null) | .name' )" | grep -v 'loop' | grep -v "$root_disk"
+echo  "-------------------------------Additional Drives-----------------------------"
+setcolordef=$(tput sgr0)
+setcolorred=$(tput setaf 1)
+setcolorgreen=$(tput setaf 2)
+root_additional_drive1=$( lsblk -r --output NAME,MOUNTPOINT | awk -F \/ '/sd/ { dsk=substr($1,1,3);dsks[dsk]+=1 } END { for ( i in dsks ) { if (dsks[i]==1) print i } }')
+result_additional_drive1=$( lsblk -d | grep "$root_additional_drive1" | awk '{print $4}' | awk -F 'G' '{print $1}' | tail -n 1 )
+if [ $OUTPUT == 1 ]
+then
+        echo "${setcolorgreen}This is master machine${setcolordef}"
+#       echo "sakshi"
+else
+        if [ $result_additional_drive1 -ge $result_additional_drive ]
+        then
+            echo "Additional-Drive (GB): ${setcolorgreen}$result_additional_drive1${setcolordef}"
+        else
+            echo "Additional-Drive (GB): ${setcolorred}$result_additional_drive1${setcolordef}"
+        fi
+fi
+echo  "-------------------------------Networking Info-------------------------------"
+echo "Public Internet Access:"
+ping -c 5 google.com
+echo  "-------------------------------System-Information----------------------------"
+echo  "uptime:"
+uptime | awk '{print $3,$4}' | sed 's/,//'
+echo  "Manufacturer:"
+cat /sys/class/dmi/id/chassis_vendor
+echo  "Product Name:"
+cat /sys/class/dmi/id/product_name
+echo  "Version:"
+cat /sys/class/dmi/id/product_version
+echo  "Serial Number:"
+cat /sys/class/dmi/id/product_serial
+echo  "Machine Type:"
+vserver=$(lscpu | grep Hypervisor | wc -l); if [ $vserver -gt 0 ]; then echo "VM"; else echo "Physical"; fi
+echo  "Operating System:"
+hostnamectl | grep "Operating System" | cut -d ' ' -f5-
